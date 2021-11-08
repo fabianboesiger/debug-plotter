@@ -1,4 +1,8 @@
 //! This crate provides a convenient macro to quickly plot variables.
+//! 
+//! When running in release mode, no plots are generated.
+//! To disable compilation of dependencies in release mode,
+//! pass `--no-default-features` to this crate.
 
 #[deny(unsafe_code)]
 
@@ -10,11 +14,15 @@
 /// ```rust
 /// debug_plotter::plot(a, b, c);
 /// ```
+/// 
+/// It is also possible to rename variables in the legend.
+/// 
+/// ```rust
+/// debug_plotter::plot(a as "Alice", b as "Bob", c as "Charlie");
+/// ```
 ///
-/// Optionally, you can provide a caption and other options for the plot
-/// after a semicolon.
-/// If no name is provided, the name defaults to the file
-/// and the line number of where the macro was called.
+/// It is possible to provide additional options for the plot
+/// after a `where` clause.
 ///
 /// ```rust
 /// debug_plotter::plot(a, b, c where caption = "My Caption");
@@ -28,10 +36,7 @@
 /// |`size`|`(400, 300)`|Sets the size of the resulting image.|
 /// |`x_desc`|`"x description"`|Sets the description of the x axis.|
 /// |`y_desc`|`"y description"`|Sets the description of the y axis.|
-///
-/// When running in release mode, no plots are generated.
-/// To disable compilation of dependencies in release mode,
-/// pass `--no-default-features` to this crate.
+/// |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
 #[macro_export]
 macro_rules! plot {
     ( $($variable:ident $( as $name:literal )? ),* $(,)? $( where $($key:ident = $value:expr),* $(,)? )?) => {
