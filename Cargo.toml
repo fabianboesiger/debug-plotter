@@ -1,0 +1,20 @@
+[package]
+authors = ["Fabian Bösiger <boesiger.fabian@outlook.com>"]
+categories = ["development-tools::debugging"]
+description = "Convenient macro to quickly plot variables."
+edition = "2018"
+keywords = ["debug", "debugging", "plot", "plotting"]
+license = "MIT OR Apache-2.0"
+name = "debug_plotter"
+readme = "README.md"
+repository = "https://github.com/fabianboesiger/debug-plotter"
+version = "0.1.0"
+
+[dependencies]
+plotters = { version = "^0.3", optional = true }
+once_cell = { version = "^1.8", optional = true }
+num-traits = { version = "^0.2", optional = true }
+
+[features]
+default = ["debug"]
+debug = ["plotters", "once_cell", "num-traits"]
