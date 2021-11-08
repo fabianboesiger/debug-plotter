@@ -12,20 +12,20 @@
 /// The macro takes a list of variables.
 ///
 /// ```rust
-/// debug_plotter::plot(a, b, c);
+/// debug_plotter::plot!(a, b, c);
 /// ```
 /// 
 /// It is also possible to rename variables in the legend.
 /// 
 /// ```rust
-/// debug_plotter::plot(a as "Alice", b as "Bob", c as "Charlie");
+/// debug_plotter::plot!(a as "Alice", b as "Bob", c as "Charlie");
 /// ```
 ///
 /// It is possible to provide additional options for the plot
 /// after a `where` clause.
 ///
 /// ```rust
-/// debug_plotter::plot(a, b, c where caption = "My Caption");
+/// debug_plotter::plot!(a, b, c where caption = "My Caption");
 /// ```
 ///
 /// The following table lists all available options.
