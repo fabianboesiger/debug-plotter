@@ -17,7 +17,7 @@
 /// and the line number of where the macro was called.
 ///
 /// ```rust
-/// debug_plotter::plot(a, b, c; caption = "My Caption");
+/// debug_plotter::plot(a, b, c where caption = "My Caption");
 /// ```
 ///
 /// The following table lists all available options.
@@ -34,7 +34,7 @@
 /// pass `--no-default-features` to this crate.
 #[macro_export]
 macro_rules! plot {
-    ( $($variable:expr $( => $name:literal )? ),* $(,)? $( ; $($key:ident = $value:expr),* $(,)? )?) => {
+    ( $($variable:ident $( as $name:literal )? ),* $(,)? $( where $($key:ident = $value:expr),* $(,)? )?) => {
         #[cfg(debug_assertions)]
         #[cfg(feature = "debug")]
         {
@@ -201,11 +201,12 @@ mod debug {
                 .fold(PlotType::MIN, |acc, &val| if val > acc { val } else { acc })
         }
 
-        // Generates and saves the plot as PNG.
+        // Generates and saves the plot.
         fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
             let default_caption = &format!("{}", self.location);
             let caption = self.options.caption.as_ref().unwrap_or(default_caption);
-            let path = format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
+            let default_path = &format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
+            let path = self.options.path.as_ref().unwrap_or(default_path);
             let path = std::path::Path::new(&path);
             println!("Saving plot \"{}\" to {:?}", caption, path);
             std::fs::create_dir_all(&path.parent().unwrap()).unwrap();
@@ -258,5 +259,6 @@ mod debug {
         pub size: Option<(u32, u32)>,
         pub x_desc: Option<String>,
         pub y_desc: Option<String>,
+        pub path: Option<String>,
     }
 }
