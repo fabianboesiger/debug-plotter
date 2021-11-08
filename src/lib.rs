@@ -24,18 +24,17 @@ macro_rules! plot {
         #[cfg(debug_assertions)]
         #[cfg(feature = "debug")]
         {
-            use once_cell::unsync::Lazy;
             use std::cell::RefCell;
             use $crate::Plottable;
 
             thread_local! {
-                static PLOT: Lazy<RefCell<$crate::Plot>> = Lazy::new(|| {
+                static PLOT: RefCell<$crate::Plot> = {
                     let mut name: Option<String> = None;
                     $(
                         name = Some(format!("{}", $name));
                     )?
                     RefCell::new($crate::Plot::new([$(stringify!($variable)),*], (file!(), line!()), name))
-                });
+                };
             }
             PLOT.with(|plot| {
                 plot.borrow_mut().insert([$($variable.to_plot_type()),*]);
