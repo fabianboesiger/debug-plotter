@@ -19,16 +19,16 @@
 /// ```rust
 /// debug_plotter::plot(a, b, c; caption = "My Caption");
 /// ```
-/// 
+///
 /// The following table lists all available options.
-/// 
+///
 /// |Identifier|Example Value|Description|
 /// |---|---|---|
 /// |`caption`|`"caption"`|Sets the caption of the plot.|
 /// |`size`|`(400, 300)`|Sets the size of the resulting image.|
 /// |`x_desc`|`"x description"`|Sets the description of the x axis.|
 /// |`y_desc`|`"y description"`|Sets the description of the y axis.|
-/// 
+///
 /// When running in release mode, no plots are generated.
 /// To disable compilation of dependencies in release mode,
 /// pass `--no-default-features` to this crate.
@@ -40,26 +40,38 @@ macro_rules! plot {
         {
             use once_cell::unsync::Lazy;
             use std::cell::RefCell;
-            use $crate::{Plottable, Plot, Options};
+            use $crate::{PLOTS, Plottable, Plot, Options, Location};
 
-            thread_local! {
-                static PLOT: Lazy<RefCell<Plot>> = Lazy::new(|| {
-                    let options = Options {
-                        $($(
-                            $key: Some($value.into()),
-                        )*)?
-                        ..Default::default()
-                    };
+            let values = [$($variable.to_plot_type()),*];
 
-                    RefCell::new(Plot::new(
-                        [$(stringify!($variable)),*],
-                        (file!(), line!()),
-                        options
-                    ))
-                });
-            }
-            PLOT.with(|plot| {
-                plot.borrow_mut().insert([$($variable.to_plot_type()),*]);
+            let location = Location {
+                file: file!(),
+                line: line!(),
+                column: column!(),
+            };
+
+            PLOTS.with(|plots| {
+                let mut map = plots
+                    .plots
+                    .lock()
+                    .unwrap();
+
+                let entry = map
+                    .entry(location.clone())
+                    .or_insert_with(|| {
+                        let names = [$(stringify!($variable)),*];
+
+                        let options = Options {
+                            $($(
+                                $key: Some($value.into()),
+                            )*)?
+                            ..Default::default()
+                        };
+
+                        Plot::new(names, location, options)
+                    });
+
+                entry.insert([$($variable.to_plot_type()),*]);
             });
         }
     };
@@ -71,7 +83,47 @@ pub use debug::*;
 #[cfg(feature = "debug")]
 mod debug {
     use num_traits::cast::ToPrimitive;
+    use once_cell::unsync::Lazy;
     use plotters::prelude::*;
+    use std::{collections::HashMap, fmt, sync::Mutex};
+
+    thread_local! {
+        pub static PLOTS: Lazy<Plots> = Lazy::new(Plots::new);
+    }
+
+    pub struct Plots {
+        pub plots: Mutex<HashMap<Location, Plot>>,
+    }
+
+    // The plots are generated as soon as `Drop` is called.
+    impl Drop for Plots {
+        fn drop(&mut self) {
+            for (_, plot) in self.plots.lock().unwrap().iter() {
+                plot.plot().unwrap();
+            }
+        }
+    }
+
+    #[derive(Hash, PartialEq, Eq, Clone, Copy)]
+    pub struct Location {
+        pub file: &'static str,
+        pub line: u32,
+        pub column: u32,
+    }
+
+    impl fmt::Display for Location {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}:{}:{}", self.file, self.line, self.column)
+        }
+    }
+
+    impl Plots {
+        fn new() -> Self {
+            Plots {
+                plots: Mutex::new(HashMap::new()),
+            }
+        }
+    }
 
     type PlotType = f64;
 
@@ -88,7 +140,6 @@ mod debug {
         }
     }
 
-    type Location = (&'static str, u32);
     type Name = &'static str;
 
     pub struct Plot {
@@ -149,7 +200,7 @@ mod debug {
 
         // Generates and saves the plot as PNG.
         fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
-            let default_caption = &format!("{}:{}", self.location.0, self.location.1);
+            let default_caption = &format!("{}", self.location);
             let caption = self.options.caption.as_ref().unwrap_or(default_caption);
             let path = format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
             let path = std::path::Path::new(&path);
@@ -164,13 +215,16 @@ mod debug {
                 .caption(caption, 30)
                 .margin(5)
                 .x_label_area_size(30)
-                .y_label_area_size(30 +
-                    if self.options.y_desc.is_some() {
-                        self.y_max().to_string().len()
-                            .max(self.y_min().to_string().len()) as i32 * 7
+                .y_label_area_size(
+                    30 + if self.options.y_desc.is_some() {
+                        self.y_max()
+                            .to_string()
+                            .len()
+                            .max(self.y_min().to_string().len()) as i32
+                            * 7
                     } else {
                         0
-                    }
+                    },
                 )
                 .build_cartesian_2d(self.x_min()..self.x_max(), self.y_min()..self.y_max())?;
 
@@ -188,7 +242,7 @@ mod debug {
 
                 chart
                     .draw_series(LineSeries::new(
-                        values.iter().map(|&v| v).enumerate(),
+                        values.iter().copied().enumerate(),
                         &color,
                     ))?
                     .label(name)
@@ -202,13 +256,6 @@ mod debug {
                 .draw()?;
 
             Ok(())
-        }
-    }
-
-    // The plot is generated as soon as `Drop` is called.
-    impl Drop for Plot {
-        fn drop(&mut self) {
-            self.plot().unwrap()
         }
     }
 
