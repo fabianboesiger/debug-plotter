@@ -1,6 +1,7 @@
 fn main() {
-    for i in 0usize..1000usize {
-        debug_plotter::plot!(i; caption = "Plot 1");
-        debug_plotter::plot!(i; caption = "Plot 2");
+    for a in 0usize..1000usize {
+        let b = a * 2;
+        debug_plotter::plot!(a; caption = "Plot 1");
+        debug_plotter::plot!(b; caption = "Plot 2");
     }
 }

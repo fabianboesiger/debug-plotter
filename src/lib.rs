@@ -34,11 +34,10 @@
 /// pass `--no-default-features` to this crate.
 #[macro_export]
 macro_rules! plot {
-    ( $($variable:ident),* $(,)? $( ; $($key:ident = $value:expr),* $(,)? )?) => {
+    ( $($variable:expr $( => $name:literal )? ),* $(,)? $( ; $($key:ident = $value:expr),* $(,)? )?) => {
         #[cfg(debug_assertions)]
         #[cfg(feature = "debug")]
         {
-            use once_cell::unsync::Lazy;
             use std::cell::RefCell;
             use $crate::{PLOTS, Plottable, Plot, Options, Location};
 
@@ -53,13 +52,18 @@ macro_rules! plot {
             PLOTS.with(|plots| {
                 let mut map = plots
                     .plots
-                    .lock()
-                    .unwrap();
-
+                    .borrow_mut();
+                
                 let entry = map
                     .entry(location.clone())
                     .or_insert_with(|| {
-                        let names = [$(stringify!($variable)),*];
+                        let names = [$({
+                            let name = stringify!($variable);
+                            $(
+                                let name = $name;
+                            )?
+                            name
+                        }),*];
 
                         let options = Options {
                             $($(
@@ -83,22 +87,21 @@ pub use debug::*;
 #[cfg(feature = "debug")]
 mod debug {
     use num_traits::cast::ToPrimitive;
-    use once_cell::unsync::Lazy;
     use plotters::prelude::*;
-    use std::{collections::HashMap, fmt, sync::Mutex};
+    use std::{cell::RefCell, collections::HashMap, fmt};
 
     thread_local! {
-        pub static PLOTS: Lazy<Plots> = Lazy::new(Plots::new);
+        pub static PLOTS: Plots = Plots::new();
     }
 
     pub struct Plots {
-        pub plots: Mutex<HashMap<Location, Plot>>,
+        pub plots: RefCell<HashMap<Location, Plot>>,
     }
 
     // The plots are generated as soon as `Drop` is called.
     impl Drop for Plots {
         fn drop(&mut self) {
-            for (_, plot) in self.plots.lock().unwrap().iter() {
+            for (_, plot) in self.plots.borrow().iter() {
                 plot.plot().unwrap();
             }
         }
@@ -120,7 +123,7 @@ mod debug {
     impl Plots {
         fn new() -> Self {
             Plots {
-                plots: Mutex::new(HashMap::new()),
+                plots: RefCell::new(HashMap::new()),
             }
         }
     }
@@ -213,19 +216,9 @@ mod debug {
 
             let mut chart = ChartBuilder::on(&root)
                 .caption(caption, 30)
-                .margin(5)
+                .margin(30)
                 .x_label_area_size(30)
-                .y_label_area_size(
-                    30 + if self.options.y_desc.is_some() {
-                        self.y_max()
-                            .to_string()
-                            .len()
-                            .max(self.y_min().to_string().len()) as i32
-                            * 7
-                    } else {
-                        0
-                    },
-                )
+                .y_label_area_size(60)
                 .build_cartesian_2d(self.x_min()..self.x_max(), self.y_min()..self.y_max())?;
 
             let mut mesh = chart.configure_mesh();
