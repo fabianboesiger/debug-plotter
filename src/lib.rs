@@ -1,3 +1,23 @@
+/// This macro is used to quickly generate plots for a list of variables.
+/// All types that implement `num_traits::cast::ToPrimitive` can be plotted.
+/// 
+/// The macro takes a list of variables.
+/// 
+/// ```rust
+/// debug_plotter::plot(a, b, c);
+/// ```
+/// 
+/// Optionally, you can provide a name for the plot.
+/// If no name is provided, the name defaults to the file
+/// and the line number of where the macro was called.
+/// 
+/// ```rust
+/// debug_plotter::plot("Plot Name"; a, b, c);
+/// ```
+/// 
+/// When running in release mode, no plots are generated.
+/// To disable compilation of dependencies in release mode,
+/// pass `--no-default-features` to this crate.
 #[macro_export]
 macro_rules! plot {
     ($($name:expr;)? $($variable:ident),*) => {
@@ -71,6 +91,7 @@ mod debug {
             }
         }
 
+        // Insert new values into the plot.
         pub fn insert<const N: usize>(&mut self, values: [PlotType; N]) {
             for (i, &value) in values.iter().enumerate() {
                 self.values[i].push(value.to_plot_type())
@@ -105,10 +126,11 @@ mod debug {
                 .fold(PlotType::MIN, |acc, &val| if val > acc { val } else { acc })
         }
 
+        // Generates and saves the plot as PNG.
         fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
             let default_caption = &format!("{}:{}", self.location.0, self.location.1);
             let caption = self.name.as_ref().unwrap_or(default_caption);
-            let path = format!(".plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
+            let path = format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
             let path = std::path::Path::new(&path);
             println!("Saving plot \"{}\" to {:?}", caption, path);
             std::fs::create_dir_all(&path.parent().unwrap()).unwrap();
@@ -147,6 +169,7 @@ mod debug {
         }
     }
 
+    // The plot is generated as soon as `Drop` is called.
     impl Drop for Plot {
         fn drop(&mut self) {
             self.plot().unwrap()

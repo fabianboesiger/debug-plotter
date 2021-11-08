@@ -4,7 +4,7 @@ This crate provides a convenient macro to quickly plot variables.
 
 ## Example
 
-In this example, we quickly want to plot the variables a, b, and c.
+In this example, we quickly want to plot the variables `a`, `b`, and `c`.
 Optionally, we can name the plot. Plots are saved as a PNG in the
 `.plots` that is created in the working directory.
 
@@ -18,10 +18,10 @@ fn main() {
 }
 ```
 
-The example above generates a plot named "My PLot" and
-saves it to `./plots/My_Plot.png`.
+The example above generates a plot named "My Plot" and
+saves it to 'plots/My_Plot.png`.
 
-![Basic PLot](.plots/My_Plot.png)
+![Basic PLot](plots/My_Plot.png)
 
 ## Debug and Release Mode
 
