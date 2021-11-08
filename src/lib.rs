@@ -1,45 +1,66 @@
+//! This crate provides a convenient macro to quickly plot variables.
+
+#[deny(unsafe_code)]
+
 /// This macro is used to quickly generate plots for a list of variables.
 /// All types that implement `num_traits::cast::ToPrimitive` can be plotted.
-/// 
+///
 /// The macro takes a list of variables.
-/// 
+///
 /// ```rust
 /// debug_plotter::plot(a, b, c);
 /// ```
-/// 
-/// Optionally, you can provide a name for the plot.
+///
+/// Optionally, you can provide a caption and other options for the plot
+/// after a semicolon.
 /// If no name is provided, the name defaults to the file
 /// and the line number of where the macro was called.
-/// 
+///
 /// ```rust
-/// debug_plotter::plot("Plot Name"; a, b, c);
+/// debug_plotter::plot(a, b, c; caption = "My Caption");
 /// ```
+/// 
+/// The following table lists all available options.
+/// 
+/// |Identifier|Example Value|Description|
+/// |---|---|---|
+/// |`caption`|`"caption"`|Sets the caption of the plot.|
+/// |`size`|`(400, 300)`|Sets the size of the resulting image.|
+/// |`x_desc`|`"x description"`|Sets the description of the x axis.|
+/// |`y_desc`|`"y description"`|Sets the description of the y axis.|
 /// 
 /// When running in release mode, no plots are generated.
 /// To disable compilation of dependencies in release mode,
 /// pass `--no-default-features` to this crate.
 #[macro_export]
 macro_rules! plot {
-    ($($name:expr;)? $($variable:ident),*) => {
+    ( $($variable:ident),* $(,)? $( ; $($key:ident = $value:expr),* $(,)? )?) => {
         #[cfg(debug_assertions)]
         #[cfg(feature = "debug")]
         {
             use once_cell::unsync::Lazy;
             use std::cell::RefCell;
-            use $crate::Plottable;
+            use $crate::{Plottable, Plot, Options};
 
             thread_local! {
-                static PLOT: Lazy<RefCell<$crate::Plot>> = Lazy::new(|| {
-                    let mut name: Option<String> = None;
-                    $(
-                        name = Some(format!("{}", $name));
-                    )?
-                    RefCell::new($crate::Plot::new([$(stringify!($variable)),*], (file!(), line!()), name))
+                static PLOT: Lazy<RefCell<Plot>> = Lazy::new(|| {
+                    let options = Options {
+                        $($(
+                            $key: Some($value.into()),
+                        )*)?
+                        ..Default::default()
+                    };
+
+                    RefCell::new(Plot::new(
+                        [$(stringify!($variable)),*],
+                        (file!(), line!()),
+                        options
+                    ))
                 });
             }
             PLOT.with(|plot| {
                 plot.borrow_mut().insert([$($variable.to_plot_type()),*]);
-            })
+            });
         }
     };
 }
@@ -52,7 +73,7 @@ mod debug {
     use num_traits::cast::ToPrimitive;
     use plotters::prelude::*;
 
-    pub type PlotType = f64;
+    type PlotType = f64;
 
     pub trait Plottable {
         fn to_plot_type(self) -> PlotType;
@@ -74,20 +95,20 @@ mod debug {
         values: Vec<Vec<PlotType>>,
         names: Vec<Name>,
         location: Location,
-        name: Option<String>,
+        options: Options,
     }
 
     impl Plot {
         pub fn new<const N: usize>(
             names: [&'static str; N],
             location: Location,
-            name: Option<String>,
+            options: Options,
         ) -> Plot {
             Plot {
                 values: vec![Vec::new(); N],
                 names: names.to_vec(),
                 location,
-                name,
+                options,
             }
         }
 
@@ -129,23 +150,38 @@ mod debug {
         // Generates and saves the plot as PNG.
         fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
             let default_caption = &format!("{}:{}", self.location.0, self.location.1);
-            let caption = self.name.as_ref().unwrap_or(default_caption);
+            let caption = self.options.caption.as_ref().unwrap_or(default_caption);
             let path = format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
             let path = std::path::Path::new(&path);
             println!("Saving plot \"{}\" to {:?}", caption, path);
             std::fs::create_dir_all(&path.parent().unwrap()).unwrap();
 
-            let root = BitMapBackend::new(&path, (640, 480)).into_drawing_area();
+            let root = BitMapBackend::new(&path, self.options.size.unwrap_or((640, 480)))
+                .into_drawing_area();
             root.fill(&WHITE)?;
 
             let mut chart = ChartBuilder::on(&root)
-                .caption(caption, ("sans-serif", 50).into_font())
+                .caption(caption, 30)
                 .margin(5)
                 .x_label_area_size(30)
-                .y_label_area_size(30)
+                .y_label_area_size(30 +
+                    if self.options.y_desc.is_some() {
+                        self.y_max().to_string().len()
+                            .max(self.y_min().to_string().len()) as i32 * 7
+                    } else {
+                        0
+                    }
+                )
                 .build_cartesian_2d(self.x_min()..self.x_max(), self.y_min()..self.y_max())?;
 
-            chart.configure_mesh().draw()?;
+            let mut mesh = chart.configure_mesh();
+            if let Some(x_desc) = &self.options.x_desc {
+                mesh.x_desc(x_desc);
+            }
+            if let Some(y_desc) = &self.options.y_desc {
+                mesh.y_desc(y_desc);
+            }
+            mesh.draw()?;
 
             for (i, (&name, values)) in self.names.iter().zip(self.values.iter()).enumerate() {
                 let color = HSLColor(i as f64 / self.names.len() as f64, 1.0, 0.5);
@@ -174,5 +210,13 @@ mod debug {
         fn drop(&mut self) {
             self.plot().unwrap()
         }
+    }
+
+    #[derive(Default)]
+    pub struct Options {
+        pub caption: Option<String>,
+        pub size: Option<(u32, u32)>,
+        pub x_desc: Option<String>,
+        pub y_desc: Option<String>,
     }
 }

@@ -5,8 +5,8 @@ This crate provides a convenient macro to quickly plot variables.
 ## Example
 
 In this example, we quickly want to plot the variables `a`, `b`, and `c`.
-Optionally, we can name the plot. Plots are saved as a PNG in the
-`.plots` that is created in the working directory.
+Optionally, we can name the plot. Plots are saved as a PNG image in the
+`plots` directory that is created in the working directory.
 
 ```rust
 fn main() {
