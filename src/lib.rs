@@ -40,7 +40,7 @@
 #[macro_export]
 macro_rules! plot {
     ( $($variable:ident $( as $name:literal )? ),* $(,)? $( where $($key:ident = $value:expr),* $(,)? )?) => {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "plot-release"))]
         #[cfg(feature = "debug")]
         {
             use std::cell::RefCell;

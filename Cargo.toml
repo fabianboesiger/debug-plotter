@@ -17,3 +17,4 @@ num-traits = { version = "^0.2", optional = true }
 [features]
 default = ["debug"]
 debug = ["plotters", "num-traits"]
+plot-release = []
