@@ -15,10 +15,10 @@
 /// ```rust
 /// debug_plotter::plot!(a, b, c);
 /// ```
-/// 
+///
 /// It is possible to pass a tuple if you want the x axis to be another value
 /// instead of the iteration number.
-/// 
+///
 /// ```rust
 /// debug_plotter::plot!((x, a), (x, b), (x, c));
 /// ```
@@ -47,6 +47,8 @@
 /// |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
 /// |`x_range`|`0f64..100f64`|Defines start and end of the x axis.|
 /// |`y_range`|`0f64..100f64`|Defines start and end of the y axis.|
+/// |`window`|`1000usize`|Defines the maximal number of values that are stored.|
+/// |`live`|`true`|Enables live mode which opens the plot in a window with live updates.|
 #[macro_export]
 macro_rules! plot {
     (
@@ -57,7 +59,7 @@ macro_rules! plot {
         #[cfg(feature = "debug")]
         {
             use std::cell::RefCell;
-            use $crate::{PLOTS, Plottable, Plot, Options, Location};
+            use $crate::{PLOTS, Plottable, PlotWrapper, Options, Location};
 
 
             let location = Location {
@@ -94,7 +96,7 @@ macro_rules! plot {
                             ..Default::default()
                         };
 
-                        Plot::new(names, location, options)
+                        PlotWrapper::new(names, location, options)
                     });
 
                 let iteration = plot.iteration();
@@ -119,22 +121,40 @@ pub use debug::*;
 #[cfg(feature = "debug")]
 mod debug {
     use num_traits::cast::ToPrimitive;
+    use piston_window::EventLoop;
+    #[cfg(feature = "live")]
+    use piston_window::{PistonWindow, WindowSettings};
     use plotters::prelude::*;
-    use std::{cell::RefCell, collections::HashMap, fmt, ops::Range};
+    #[cfg(feature = "live")]
+    use plotters_piston::draw_piston_window;
+    use std::{
+        cell::RefCell,
+        collections::{HashMap, VecDeque},
+        fmt,
+        ops::Range,
+    };
 
     thread_local! {
         pub static PLOTS: Plots = Plots::new();
     }
 
     pub struct Plots {
-        pub plots: RefCell<HashMap<Location, Plot>>,
+        pub plots: RefCell<HashMap<Location, PlotWrapper>>,
     }
 
     // The plots are generated as soon as `Drop` is called.
     impl Drop for Plots {
         fn drop(&mut self) {
             for (_, plot) in self.plots.borrow().iter() {
-                plot.plot().unwrap();
+                plot.plot_to_file();
+            }
+        }
+    }
+
+    impl Plots {
+        fn new() -> Self {
+            Plots {
+                plots: RefCell::new(HashMap::new()),
             }
         }
     }
@@ -149,14 +169,6 @@ mod debug {
     impl fmt::Display for Location {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}:{}:{}", self.file, self.line, self.column)
-        }
-    }
-
-    impl Plots {
-        fn new() -> Self {
-            Plots {
-                plots: RefCell::new(HashMap::new()),
-            }
         }
     }
 
@@ -177,26 +189,103 @@ mod debug {
 
     type Name = &'static str;
 
+    pub struct PlotWrapper {
+        plot: Plot,
+        #[cfg(feature = "live")]
+        window: Option<PistonWindow>,
+        live: bool,
+    }
+
+    impl PlotWrapper {
+        pub fn new<const N: usize>(
+            names: [&'static str; N],
+            location: Location,
+            options: Options,
+        ) -> PlotWrapper {
+            let default_caption = format!("{}", location);
+            let caption = options.caption.unwrap_or(default_caption);
+            let default_path = format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
+            let path = options.path.unwrap_or(default_path);
+
+            let options = Options {
+                caption: Some(caption),
+                path: Some(path),
+                ..options
+            };
+
+            let live = options.live.unwrap_or(false);
+
+            PlotWrapper {
+                live,
+                #[cfg(feature = "live")]
+                window: {
+                    if live {
+                        Some({
+                            let mut window: PistonWindow = WindowSettings::new(
+                                options.caption.as_ref().unwrap(),
+                                options.size.map(|(x, y)| [x, y]).unwrap_or([640, 480]),
+                                )
+                                .build()
+                                .unwrap();
+                        
+                            window.set_max_fps(30);
+                            window
+                        })
+                    } else {
+                        None
+                    }
+                },
+                plot: Plot::new(names, options),
+            }
+        }
+
+        #[cfg(feature = "live")]
+        fn plot_to_window(&mut self) {
+            if let Some(window) = &mut self.window {
+                let plot = &self.plot;
+                draw_piston_window(window, |backend| {
+                    plot.plot(backend).unwrap();
+                    Ok(())
+                })
+                .unwrap();
+            }
+        }
+
+        fn plot_to_file(&self) {
+            if !self.live {
+                self.plot.plot_to_file();
+            }
+        }
+
+        // Get current number of iteration.
+        pub fn iteration(&self) -> u64 {
+            self.plot.iteration()
+        }
+
+        // Insert new values into the plot.
+        pub fn insert<const N: usize>(&mut self, values: [(PlotType, PlotType); N]) {
+            self.plot.insert(values);
+            #[cfg(feature = "live")]
+            {
+                self.plot_to_window();
+            }
+        }
+    }
+
     pub struct Plot {
-        values: Vec<Vec<(PlotType, PlotType)>>,
+        values: Vec<VecDeque<(PlotType, PlotType)>>,
         names: Vec<Name>,
-        location: Location,
         options: Options,
         iteration: u64,
     }
 
     impl Plot {
-        pub fn new<const N: usize>(
-            names: [&'static str; N],
-            location: Location,
-            options: Options,
-        ) -> Plot {
+        pub fn new<const N: usize>(names: [&'static str; N], options: Options) -> Plot {
             Plot {
-                values: vec![Vec::new(); N],
+                values: vec![VecDeque::new(); N],
                 names: names.to_vec(),
-                location,
-                options,
                 iteration: 0,
+                options,
             }
         }
 
@@ -208,7 +297,12 @@ mod debug {
         // Insert new values into the plot.
         pub fn insert<const N: usize>(&mut self, values: [(PlotType, PlotType); N]) {
             for (i, &value) in values.iter().enumerate() {
-                self.values[i].push(value)
+                if let Some(window) = self.options.window {
+                    if self.values[i].len() == window {
+                        self.values[i].pop_front();
+                    }
+                }
+                self.values[i].push_back(value);
             }
             self.iteration += 1;
         }
@@ -245,29 +339,29 @@ mod debug {
                 .fold(PlotType::MIN, |acc, &val| if val > acc { val } else { acc })
         }
 
-        // Generates and saves the plot.
-        fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
-            let default_caption = &format!("{}", self.location);
-            let caption = self.options.caption.as_ref().unwrap_or(default_caption);
-            let default_path =
-                &format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
-            let path = self.options.path.as_ref().unwrap_or(default_path);
-            let path = std::path::Path::new(&path);
-            println!("Saving plot \"{}\" to {:?}", caption, path);
-            std::fs::create_dir_all(&path.parent().unwrap()).unwrap();
-
-            let root = BitMapBackend::new(&path, self.options.size.unwrap_or((640, 480)))
-                .into_drawing_area();
+        // Generates the plot.
+        fn plot<B>(&self, backend: B) -> Result<(), Box<dyn std::error::Error>>
+        where
+            B: DrawingBackend,
+            B::ErrorType: 'static,
+        {
+            let root = backend.into_drawing_area();
             root.fill(&WHITE)?;
 
             let mut chart = ChartBuilder::on(&root)
-                .caption(caption, 30)
+                .caption(self.options.caption.as_ref().unwrap(), 30)
                 .margin(30)
                 .x_label_area_size(30)
                 .y_label_area_size(60)
                 .build_cartesian_2d(
-                    self.options.x_range.clone().unwrap_or(self.x_min()..self.x_max()), 
-                    self.options.y_range.clone().unwrap_or(self.y_min()..self.y_max()),
+                    self.options
+                        .x_range
+                        .clone()
+                        .unwrap_or(self.x_min()..self.x_max()),
+                    self.options
+                        .y_range
+                        .clone()
+                        .unwrap_or(self.y_min()..self.y_max()),
                 )?;
 
             let mut mesh = chart.configure_mesh();
@@ -296,9 +390,21 @@ mod debug {
 
             Ok(())
         }
+
+        fn plot_to_file(&self) {
+            let path = std::path::Path::new(self.options.path.as_ref().unwrap());
+            println!(
+                "Saving plot \"{}\" to {:?}",
+                self.options.caption.as_ref().unwrap(),
+                path
+            );
+            std::fs::create_dir_all(&path.parent().unwrap()).unwrap();
+            let backend = BitMapBackend::new(&path, self.options.size.unwrap_or((640, 480)));
+            self.plot(backend).unwrap();
+        }
     }
 
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct Options {
         pub caption: Option<String>,
         pub size: Option<(u32, u32)>,
@@ -307,5 +413,8 @@ mod debug {
         pub path: Option<String>,
         pub x_range: Option<Range<PlotType>>,
         pub y_range: Option<Range<PlotType>>,
+        pub window: Option<usize>,
+        #[cfg(feature = "live")]
+        pub live: Option<bool>,
     }
 }
