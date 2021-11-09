@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 name = "debug_plotter"
 readme = "README.md"
 repository = "https://github.com/fabianboesiger/debug-plotter"
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies]
 plotters = { version = "^0.3", optional = true }

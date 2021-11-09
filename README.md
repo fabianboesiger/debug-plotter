@@ -24,6 +24,11 @@ saves it to 'plots/My_Plot.png`.
 
 ![Basic PLot](plots/My_Plot.png)
 
+## Documentation
+
+For more information on how to use this crate, please take a look at the [documentation](https://docs.rs/debug_plotter/0.2.0/debug_plotter/) or the [examples](https://github.com/fabianboesiger/debug-plotter/tree/main/examples).
+
+
 ## Debug and Release Mode
 
 Variables are only plotted if your code is run in debug mode.
