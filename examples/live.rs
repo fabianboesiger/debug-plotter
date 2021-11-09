@@ -11,10 +11,11 @@ fn main() {
             where
             caption = "Live Trigonometry",
             x_desc = "x",
-            window = 100usize,
+            values = 100usize,
             live = true,
             size = (1080, 720)
         );
+
         i += 1;
     }
 }

@@ -47,7 +47,7 @@
 /// |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
 /// |`x_range`|`0f64..100f64`|Defines start and end of the x axis.|
 /// |`y_range`|`0f64..100f64`|Defines start and end of the y axis.|
-/// |`window`|`1000usize`|Defines the maximal number of values that are stored.|
+/// |`values`|`1000usize`|Defines the maximal number of values that are stored. If the macro is called more times than this number, the oldest value is dropped again.|
 /// |`live`|`true`|Enables live mode which opens the plot in a window with live updates.|
 #[macro_export]
 macro_rules! plot {
@@ -297,7 +297,7 @@ mod debug {
         // Insert new values into the plot.
         pub fn insert<const N: usize>(&mut self, values: [(PlotType, PlotType); N]) {
             for (i, &value) in values.iter().enumerate() {
-                if let Some(window) = self.options.window {
+                if let Some(window) = self.options.values {
                     if self.values[i].len() == window {
                         self.values[i].pop_front();
                     }
@@ -413,7 +413,7 @@ mod debug {
         pub path: Option<String>,
         pub x_range: Option<Range<PlotType>>,
         pub y_range: Option<Range<PlotType>>,
-        pub window: Option<usize>,
+        pub values: Option<usize>,
         #[cfg(feature = "live")]
         pub live: Option<bool>,
     }
