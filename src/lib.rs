@@ -45,6 +45,8 @@
 /// |`x_desc`|`"x description"`|Sets the description of the x axis.|
 /// |`y_desc`|`"y description"`|Sets the description of the y axis.|
 /// |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
+/// |`x_range`|`0f64..100f64`|Defines start and end of the x axis.|
+/// |`y_range`|`0f64..100f64`|Defines start and end of the y axis.|
 #[macro_export]
 macro_rules! plot {
     (
@@ -118,7 +120,7 @@ pub use debug::*;
 mod debug {
     use num_traits::cast::ToPrimitive;
     use plotters::prelude::*;
-    use std::{cell::RefCell, collections::HashMap, fmt};
+    use std::{cell::RefCell, collections::HashMap, fmt, ops::Range};
 
     thread_local! {
         pub static PLOTS: Plots = Plots::new();
@@ -263,7 +265,10 @@ mod debug {
                 .margin(30)
                 .x_label_area_size(30)
                 .y_label_area_size(60)
-                .build_cartesian_2d(self.x_min()..self.x_max(), self.y_min()..self.y_max())?;
+                .build_cartesian_2d(
+                    self.options.x_range.clone().unwrap_or(self.x_min()..self.x_max()), 
+                    self.options.y_range.clone().unwrap_or(self.y_min()..self.y_max()),
+                )?;
 
             let mut mesh = chart.configure_mesh();
             if let Some(x_desc) = &self.options.x_desc {
@@ -300,5 +305,7 @@ mod debug {
         pub x_desc: Option<String>,
         pub y_desc: Option<String>,
         pub path: Option<String>,
+        pub x_range: Option<Range<PlotType>>,
+        pub y_range: Option<Range<PlotType>>,
     }
 }

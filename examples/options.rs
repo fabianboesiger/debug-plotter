@@ -4,9 +4,11 @@ fn main() {
             i where
             caption = "Options",
             size = (400, 300),
+            path = "plots/Options.jpg",
             x_desc = "X Description",
             y_desc = "Y Description",
-            path = "plots/Options.jpg"
+            x_range = 0f64..500f64,
+            y_range = 0f64..500f64
         );
     }
 }
