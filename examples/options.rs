@@ -6,7 +6,7 @@ fn main() {
             size = (400, 300),
             x_desc = "X Description",
             y_desc = "Y Description",
-            path = "plots/custom_path.jpg"
+            path = "plots/Options.jpg"
         );
     }
 }

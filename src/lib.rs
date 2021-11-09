@@ -1,5 +1,5 @@
 //! This crate provides a convenient macro to quickly plot variables.
-//! 
+//!
 //! When running in release mode, no plots are generated.
 //! To disable compilation of dependencies in release mode,
 //! pass `--no-default-features` to this crate.
@@ -9,20 +9,28 @@
 /// This macro is used to quickly generate plots for a list of variables.
 /// All types that implement `num_traits::cast::ToPrimitive` can be plotted.
 ///
-/// The macro takes a list of variables.
+/// The macro takes a list of variables. By default, the value of the variable
+/// is mapped to the y axis, and the x axis shows the iteration number.
 ///
 /// ```rust
 /// debug_plotter::plot!(a, b, c);
 /// ```
 /// 
-/// It is also possible to rename variables in the legend.
+/// It is possible to pass a tuple if you want the x axis to be another value
+/// instead of the iteration number.
 /// 
+/// ```rust
+/// debug_plotter::plot!((x, a), (x, b), (x, c));
+/// ```
+///
+/// It is also possible to rename variables in the legend using the keyword `as`.
+///
 /// ```rust
 /// debug_plotter::plot!(a as "Alice", b as "Bob", c as "Charlie");
 /// ```
 ///
 /// It is possible to provide additional options for the plot
-/// after a `where` clause.
+/// after a `where` keyword.
 ///
 /// ```rust
 /// debug_plotter::plot!(a, b, c where caption = "My Caption");
@@ -39,14 +47,16 @@
 /// |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
 #[macro_export]
 macro_rules! plot {
-    ( $($variable:ident $( as $name:literal )? ),* $(,)? $( where $($key:ident = $value:expr),* $(,)? )?) => {
+    (
+        $( $( $variable:ident )? $( ( $x:ident, $y:ident ) )? $( as $name:literal )? ),* $(,)?
+        $( where $($key:ident = $value:expr),* $(,)? )?
+    ) => {
         #[cfg(any(debug_assertions, feature = "plot-release"))]
         #[cfg(feature = "debug")]
         {
             use std::cell::RefCell;
             use $crate::{PLOTS, Plottable, Plot, Options, Location};
 
-            let values = [$($variable.to_plot_type()),*];
 
             let location = Location {
                 file: file!(),
@@ -58,12 +68,17 @@ macro_rules! plot {
                 let mut map = plots
                     .plots
                     .borrow_mut();
-                
-                let entry = map
+
+                let plot = map
                     .entry(location.clone())
                     .or_insert_with(|| {
                         let names = [$({
-                            let name = stringify!($variable);
+                            $(
+                                let name = stringify!($variable);
+                            )?
+                            $(
+                                let name = stringify!($y);
+                            )?
                             $(
                                 let name = $name;
                             )?
@@ -80,7 +95,17 @@ macro_rules! plot {
                         Plot::new(names, location, options)
                     });
 
-                entry.insert([$($variable.to_plot_type()),*]);
+                let iteration = plot.iteration();
+
+                plot.insert([$({
+                    $(
+                        let value = (iteration.to_plot_type(), $variable.to_plot_type());
+                    )?
+                    $(
+                        let value = ($x.to_plot_type(), $y.to_plot_type());
+                    )?
+                    value
+                }),*]);
             });
         }
     };
@@ -151,10 +176,11 @@ mod debug {
     type Name = &'static str;
 
     pub struct Plot {
-        values: Vec<Vec<PlotType>>,
+        values: Vec<Vec<(PlotType, PlotType)>>,
         names: Vec<Name>,
         location: Location,
         options: Options,
+        iteration: u64,
     }
 
     impl Plot {
@@ -168,32 +194,43 @@ mod debug {
                 names: names.to_vec(),
                 location,
                 options,
+                iteration: 0,
             }
+        }
+
+        // Get current number of iteration.
+        pub fn iteration(&self) -> u64 {
+            self.iteration
         }
 
         // Insert new values into the plot.
-        pub fn insert<const N: usize>(&mut self, values: [PlotType; N]) {
+        pub fn insert<const N: usize>(&mut self, values: [(PlotType, PlotType); N]) {
             for (i, &value) in values.iter().enumerate() {
-                self.values[i].push(value.to_plot_type())
+                self.values[i].push(value)
             }
+            self.iteration += 1;
         }
 
-        fn x_min(&self) -> usize {
-            0
-        }
-
-        fn x_max(&self) -> usize {
+        fn x_min(&self) -> PlotType {
             self.values
                 .iter()
-                .map(|values| values.len() - 1)
-                .max()
-                .unwrap_or(0)
+                .map(|values| values.iter().map(|(x, _)| x))
+                .flatten()
+                .fold(PlotType::MAX, |acc, &val| if val < acc { val } else { acc })
+        }
+
+        fn x_max(&self) -> PlotType {
+            self.values
+                .iter()
+                .map(|values| values.iter().map(|(x, _)| x))
+                .flatten()
+                .fold(PlotType::MIN, |acc, &val| if val > acc { val } else { acc })
         }
 
         fn y_min(&self) -> PlotType {
             self.values
                 .iter()
-                .map(|values| values.iter())
+                .map(|values| values.iter().map(|(_, y)| y))
                 .flatten()
                 .fold(PlotType::MAX, |acc, &val| if val < acc { val } else { acc })
         }
@@ -201,7 +238,7 @@ mod debug {
         fn y_max(&self) -> PlotType {
             self.values
                 .iter()
-                .map(|values| values.iter())
+                .map(|values| values.iter().map(|(_, y)| y))
                 .flatten()
                 .fold(PlotType::MIN, |acc, &val| if val > acc { val } else { acc })
         }
@@ -210,7 +247,8 @@ mod debug {
         fn plot(&self) -> Result<(), Box<dyn std::error::Error>> {
             let default_caption = &format!("{}", self.location);
             let caption = self.options.caption.as_ref().unwrap_or(default_caption);
-            let default_path = &format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
+            let default_path =
+                &format!("plots/{}.png", caption.replace("/", "-").replace(" ", "_"));
             let path = self.options.path.as_ref().unwrap_or(default_path);
             let path = std::path::Path::new(&path);
             println!("Saving plot \"{}\" to {:?}", caption, path);
@@ -240,10 +278,7 @@ mod debug {
                 let color = HSLColor(i as f64 / self.names.len() as f64, 1.0, 0.5);
 
                 chart
-                    .draw_series(LineSeries::new(
-                        values.iter().copied().enumerate(),
-                        &color,
-                    ))?
+                    .draw_series(LineSeries::new(values.iter().copied(), &color))?
                     .label(name)
                     .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &color));
             }
