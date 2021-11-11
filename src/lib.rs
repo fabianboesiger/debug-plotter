@@ -224,10 +224,10 @@ mod debug {
                             let mut window: PistonWindow = WindowSettings::new(
                                 options.caption.as_ref().unwrap(),
                                 options.size.map(|(x, y)| [x, y]).unwrap_or([640, 480]),
-                                )
-                                .build()
-                                .unwrap();
-                        
+                            )
+                            .build()
+                            .unwrap();
+
                             window.set_max_fps(30);
                             window
                         })
