@@ -69,7 +69,7 @@ The following table lists all available options.
 |`path`|`"/plots/my_plot.jpg"`|Defines where the plot is saved.|
 |`x_range`|`0f64..100f64`|Defines start and end of the x axis.|
 |`y_range`|`0f64..100f64`|Defines start and end of the y axis.|
-|`values`|`1000usize`|Defines the maximal number of values that are stored. If the macro is called more times than this number, the oldest value is dropped again.|
+|`values`|`1000usize`|Defines the maximal number of values that are stored. If the macro is called more times than this number, the oldest value is dropped.|
 |`live`|`true`|Enables live mode which opens the plot in a window with live updates.|
 
 ### Features Overview
