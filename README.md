@@ -70,17 +70,7 @@ The following table lists all available options.
 |`x_range`|`0f64..100f64`|Defines start and end of the x axis.|
 |`y_range`|`0f64..100f64`|Defines start and end of the y axis.|
 |`values`|`1000usize`|Defines the maximal number of values that are stored. If the macro is called more times than this number, the oldest value is dropped.|
-|`live`|`true`|Enables live mode which opens the plot in a window with live updates.|
-
-### Features Overview
-
-The following table lists all available features.
-
-|Feature|Description|
-|---|---|
-|`debug`|Enabled by default, disable to avoid compiling the dependencies in release mode.|
-|`plot-release`|Disabled by default, enable to start plotting in release mode.|
-|`live`|Enabled by default, enables live debugging by opening a window when passing `live = true` to the `plot!` macro.|
+|`live`|`true`|Enables live mode which opens the plot in a window with live updates. Requires feature `live`, which is enabled by default.|
 
 ## Debug and Release Mode
 
