@@ -55,8 +55,6 @@ macro_rules! plot {
         $( $( $variable:ident )? $( ( $x:ident, $y:ident ) )? $( as $name:literal )? ),* $(,)?
         $( where $($key:ident = $value:expr),* $(,)? )?
     ) => {
-        #[cfg(any(debug_assertions, feature = "plot-release"))]
-        #[cfg(feature = "debug")]
         {
             use std::cell::RefCell;
             use $crate::{PLOTS, Plottable, PlotWrapper, Options, Location};
@@ -115,10 +113,25 @@ macro_rules! plot {
     };
 }
 
-#[cfg(feature = "debug")]
+/// This does the same as `plot!`, but does not do anything in release mode.
+#[macro_export]
+macro_rules! debug_plot {
+    (
+        $( $( $variable:ident )? $( ( $x:ident, $y:ident ) )? $( as $name:literal )? ),* $(,)?
+        $( where $($key:ident = $value:expr),* $(,)? )?
+    ) => {
+        #[cfg(debug_assertions)]
+        {
+            $crate::plot!(
+                $( $( $variable )? $( ( $x, $y ) )? $( as $name )? ),*
+                $( where $($key = $value),* )?
+            );
+        }
+    }
+}
+
 pub use debug::*;
 
-#[cfg(feature = "debug")]
 mod debug {
     use num_traits::cast::ToPrimitive;
     use piston_window::EventLoop;

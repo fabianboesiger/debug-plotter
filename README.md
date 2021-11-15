@@ -84,7 +84,5 @@ The following table lists all available features.
 
 ## Debug and Release Mode
 
-Variables are only plotted if your code is run in debug mode.
-In release mode, `plot!` macros are ignored.
-If you want to avoid compiling the dependencies for this crate in release mode, add `--no-default-features`.
-If you want to plot variables in release mode, use the feature `plot-release`.
+The `plot!` macro generates plots in debug and release mode.
+If you want to avoid generating plots in release mode, use `debug_plot!` instead.
