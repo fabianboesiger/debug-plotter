@@ -13,6 +13,7 @@ version = "0.3.0"
 [dependencies]
 plotters = "^0.3"
 num-traits = "^0.2"
+log = "^0.4"
 piston_window = { version = "0.120.0", optional = true }
 plotters-piston = { git = "https://github.com/plotters-rs/plotters-piston", optional = true }
 

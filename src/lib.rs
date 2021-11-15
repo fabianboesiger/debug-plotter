@@ -406,7 +406,7 @@ mod debug {
 
         fn plot_to_file(&self) {
             let path = std::path::Path::new(self.options.path.as_ref().unwrap());
-            println!(
+            log::info!(
                 "Saving plot \"{}\" to {:?}",
                 self.options.caption.as_ref().unwrap(),
                 path
