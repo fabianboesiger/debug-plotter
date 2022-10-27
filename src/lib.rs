@@ -134,6 +134,7 @@ pub use debug::*;
 
 mod debug {
     use num_traits::cast::ToPrimitive;
+    #[cfg(feature = "live")]
     use piston_window::EventLoop;
     #[cfg(feature = "live")]
     use piston_window::{PistonWindow, WindowSettings};
@@ -226,7 +227,11 @@ mod debug {
                 ..options
             };
 
+
+            #[cfg(feature = "live")]
             let live = options.live.unwrap_or(false);
+            #[cfg(not(feature = "live"))]
+                let live = false;
 
             PlotWrapper {
                 live,
